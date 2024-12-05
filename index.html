@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Modern Sudoku Solver</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-primary: #fafafa;
+        --bg-secondary: #ffffff;
+        --text-primary: #1a1a1a;
+        --text-secondary: #666666;
+        --accent: #007aff;
+        --border: #e1e1e1;
+        --hover: #f5f5f5;
+        --cell-size: 58px;
+        --cell-font: 24px;
+        --note-size: 12px;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-primary: #1a1a1a;
+          --bg-secondary: #2a2a2a;
+          --text-primary: #ffffff;
+          --text-secondary: #999999;
+          --border: #3a3a3a;
+          --hover: #333333;
+          --shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      body {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        transition: background-color 0.3s, color 0.3s;
+      }
+
+      .app-container {
+        background: var(--bg-secondary);
+        border-radius: 24px;
+        padding: 32px;
+        box-shadow: var(--shadow);
+        max-width: 1200px;
+        width: 100%;
+        display: flex;
+        gap: 40px;
+        transition: background-color 0.3s, box-shadow 0.3s;
+      }
+
+      .game-section {
+        flex: 1;
+      }
+
+      .controls-section {
+        width: 300px;
+      }
+
+      .header {
+        margin-bottom: 24px;
+      }
+
+      .title {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .subtitle {
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      #sudoku-grid {
+        display: grid;
+        grid-template-columns: repeat(9, var(--cell-size));
+        gap: 1px;
+        background: var(--border);
+        padding: 2px;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .cell {
+        width: var(--cell-size);
+        height: var(--cell-size);
+        background: var(--bg-secondary);
+        position: relative;
+        transition: background-color 0.2s;
+      }
+
+      .cell input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        text-align: center;
+        font-size: var(--cell-font);
+        color: var(--text-primary);
+        background: transparent;
+        outline: none;
+        transition: background-color 0.2s;
+      }
+
+      .cell input:focus {
+        background: var(--hover);
+      }
+
+      .notes {
+        position: absolute;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        font-size: var(--note-size);
+        color: var(--text-secondary);
+      }
+
+      .note {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .block-divider {
+        border: 1px solid var(--border);
+      }
+
+      .controls {
+        display: grid;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      button {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 10px;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid var(--border);
+      }
+
+      button:hover {
+        background: var(--hover);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-hover);
+      }
+
+      button.primary {
+        background: var(--accent);
+        color: white;
+        border: none;
+      }
+
+      button.primary:hover {
+        opacity: 0.9;
+      }
+
+      .stats-card {
+        background: var(--bg-secondary);
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 24px;
+        border: 1px solid var(--border);
+      }
+
+      .stat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .stat-item:last-child {
+        border-bottom: none;
+      }
+
+      .stat-label {
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .stat-value {
+        font-weight: 500;
+      }
+
+      .difficulty-selector {
+        padding: 12px;
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 14px;
+        margin-bottom: 16px;
+        outline: none;
+      }
+
+      .solving {
+        background: rgba(0, 122, 255, 0.1);
+      }
+
+      .invalid {
+        animation: shake 0.3s;
+        background: rgba(255, 59, 48, 0.1);
+      }
+
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-3px);
+        }
+        75% {
+          transform: translateX(3px);
+        }
+      }
+
+      @media (max-width: 1024px) {
+        .app-container {
+          flex-direction: column;
+        }
+
+        .controls-section {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 600px) {
+        :root {
+          --cell-size: 35px;
+          --cell-font: 18px;
+          --note-size: 8px;
+        }
+
+        .app-container {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <div class="game-section">
+        <div class="header">
+          <h1 class="title">Sudoku Solver</h1>
+          <p class="subtitle">
+            Advanced algorithm with backtracking visualization
+          </p>
+        </div>
+        <div id="sudoku-grid"></div>
+        <div class="controls">
+          <button class="primary" onclick="solveSudoku()">Solve Puzzle</button>
+          <div style="display: flex; gap: 12px">
+            <button onclick="clearGrid()">Clear Grid</button>
+            <button onclick="loadExample()">Load Example</button>
+            <button onclick="toggleNotes()">Toggle Notes</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-section">
+        <select class="difficulty-selector" onchange="loadPuzzle(this.value)">
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+          <option value="expert">Expert</option>
+        </select>
+
+        <div class="stats-card">
+          <div class="stat-item">
+            <span class="stat-label">Time Elapsed</span>
+            <span class="stat-value" id="time-elapsed">00:00</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Cells Filled</span>
+            <span class="stat-value" id="cells-filled">0/81</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Backtracks</span>
+            <span class="stat-value" id="backtrack-count">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      class SudokuSolver {
+        constructor() {
+          this.grid = Array(9)
+            .fill()
+            .map(() => Array(9).fill(0));
+          this.notes = Array(9)
+            .fill()
+            .map(() =>
+              Array(9)
+                .fill()
+                .map(() => new Set())
+            );
+          this.solving = false;
+          this.backtrackCount = 0;
+          this.showNotes = false;
+          this.startTime = null;
+          this.timer = null;
+          this.initializeGrid();
+          this.initializeEventListeners();
+        }
+
+        initializeGrid() {
+          const sudokuGrid = document.getElementById("sudoku-grid");
+          sudokuGrid.innerHTML = "";
+
+          for (let i = 0; i < 9; i++) {
+            for (let j = 0; j < 9; j++) {
+              const cell = document.createElement("div");
+              cell.className = "cell";
+              if (j % 3 === 0 && j !== 0)
+                cell.classList.add("block-divider-vertical");
+              if (i % 3 === 0 && i !== 0)
+                cell.classList.add("block-divider-horizontal");
+
+              const input = document.createElement("input");
+              input.type = "text";
+              input.maxLength = 1;
+              input.dataset.row = i;
+              input.dataset.col = j;
+
+              const notes = document.createElement("div");
+              notes.className = "notes";
+              notes.style.display = "none";
+              for (let k = 0; k < 9; k++) {
+                const note = document.createElement("div");
+                note.className = "note";
+                notes.appendChild(note);
+              }
+
+              cell.appendChild(notes);
+              cell.appendChild(input);
+              sudokuGrid.appendChild(cell);
+            }
+          }
+        }
+
+        initializeEventListeners() {
+          document.querySelectorAll(".cell input").forEach((input) => {
+            input.addEventListener("input", (e) => this.handleInput(e));
+            input.addEventListener("focus", (e) =>
+              this.highlightRelatedCells(e)
+            );
+            input.addEventListener("blur", () => this.removeHighlights());
+          });
+        }
+
+        handleInput(e) {
+          const row = parseInt(e.target.dataset.row);
+          const col = parseInt(e.target.dataset.col);
+          const val = e.target.value;
+
+          if (val && (isNaN(val) || val < 1 || val > 9)) {
+            e.target.value = "";
+            return;
+          }
+
+          this.grid[row][col] = parseInt(val) || 0;
+
+          if (!this.validateCell(row, col)) {
+            e.target.parentElement.classList.add("invalid");
+            setTimeout(() => {
+              e.target.parentElement.classList.remove("invalid");
+            }, 1000);
+          }
+
+          this.updateStats();
+          this.updateNotes(row, col);
+        }
+
+        highlightRelatedCells(e) {
+          const row = parseInt(e.target.dataset.row);
+          const col = parseInt(e.target.dataset.col);
+
+          // Highlight same row and column
+          for (let i = 0; i < 9; i++) {
+            document
+              .querySelector(`input[data-row="${row}"][data-col="${i}"]`)
+              .parentElement.classList.add("highlight");
+            document
+              .querySelector(`input[data-row="${i}"][data-col="${col}"]`)
+              .parentElement.classList.add("highlight");
+          }
+
+          // Highlight 3x3 box
+          const boxRow = Math.floor(row / 3) * 3;
+          const boxCol = Math.floor(col / 3) * 3;
+          for (let i = boxRow; i < boxRow + 3; i++) {
+            for (let j = boxCol; j < boxCol + 3; j++) {
+              document
+                .querySelector(`input[data-row="${i}"][data-col="${j}"]`)
+                .parentElement.classList.add("highlight");
+            }
+          }
+        }
+
+        removeHighlights() {
+          document.querySelectorAll(".cell").forEach((cell) => {
+            cell.classList.remove("highlight");
+          });
+        }
+
+        validateCell(row, col) {
+          const value = this.grid[row][col];
+          if (!value) return true;
+
+          // Check row and column
+          for (let i = 0; i < 9; i++) {
+            if (i !== col && this.grid[row][i] === value) return false;
+            if (i !== row && this.grid[i][col] === value) return false;
+          }
+
+          // Check 3x3 box
+          const boxRow = Math.floor(row / 3) * 3;
+          const boxCol = Math.floor(col / 3) * 3;
+          for (let i = boxRow; i < boxRow + 3; i++) {
+            for (let j = boxCol; j < boxCol + 3; j++) {
+              if (i !== row && j !== col && this.grid[i][j] === value)
+                return false;
+            }
+          }
+
+          return true;
+        }
+
+        async solve() {
+          if (this.solving) return;
+
+          this.solving = true;
+          this.backtrackCount = 0;
+          this.startTime = Date.now();
+          this.timer = setInterval(() => this.updateTimer(), 1000);
+
+          const success = await this.solveRecursive(0, 0);
+
+          clearInterval(this.timer);
+          this.solving = false;
+
+          if (!success) {
+            alert("No solution exists for this puzzle!");
+          }
+        }
+
+        async solveRecursive(row, col) {
+          if (col === 9) {
+            row++;
+            col = 0;
+          }
+          if (row === 9) return true;
+
+          if (this.grid[row][col] !== 0) {
+            return await this.solveRecursive(row, col + 1);
+          }
+
+          // Get possible values for optimization
+          const possibleValues = this.getPossibleValues(row, col);
+
+          for (const num of possibleValues) {
+            this.grid[row][col] = num;
+            this.updateCell(row, col, num);
+            await new Promise((resolve) => setTimeout(resolve, 50));
+
+            if (await this.solveRecursive(row, col + 1)) {
+              return true;
+            }
+
+            this.backtrackCount++;
+            document.getElementById("backtrack-count").textContent =
+              this.backtrackCount;
+            this.grid[row][col] = 0;
+            this.updateCell(row, col, "");
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+
+          return false;
+        }
+
+        getPossibleValues(row, col) {
+          const values = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+          // Check row and column
+          for (let i = 0; i < 9; i++) {
+            values.delete(this.grid[row][i]);
+            values.delete(this.grid[i][col]);
+          }
+
+          // Check 3x3 box
+          const boxRow = Math.floor(row / 3) * 3;
+          const boxCol = Math.floor(col / 3) * 3;
+          for (let i = boxRow; i < boxRow + 3; i++) {
+            for (let j = boxCol; j < boxCol + 3; j++) {
+              values.delete(this.grid[i][j]);
+            }
+          }
+
+          return values;
+        }
+
+        async animateSolution(solution) {
+          for (let i = 0; i < 9; i++) {
+            for (let j = 0; j < 9; j++) {
+              if (this.grid[i][j] !== solution[i][j]) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+                this.updateCell(i, j, solution[i][j]);
+              }
+            }
+          }
+        }
+
+        isValid(row, col, num) {
+          for (let i = 0; i < 9; i++) {
+            if (this.grid[row][i] === num) return false;
+            if (this.grid[i][col] === num) return false;
+          }
+
+          const boxRow = Math.floor(row / 3) * 3;
+          const boxCol = Math.floor(col / 3) * 3;
+          for (let i = boxRow; i < boxRow + 3; i++) {
+            for (let j = boxCol; j < boxCol + 3; j++) {
+              if (this.grid[i][j] === num) return false;
+            }
+          }
+
+          return true;
+        }
+
+        updateCell(row, col, value) {
+          const input = document.querySelector(
+            `input[data-row="${row}"][data-col="${col}"]`
+          );
+          input.value = value;
+          input.parentElement.classList.toggle("solving", Boolean(value));
+        }
+
+        updateStats() {
+          const filledCells = this.grid.flat().filter((x) => x !== 0).length;
+          document.getElementById(
+            "cells-filled"
+          ).textContent = `${filledCells}/81`;
+        }
+
+        updateTimer() {
+          const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+          const minutes = Math.floor(elapsed / 60)
+            .toString()
+            .padStart(2, "0");
+          const seconds = (elapsed % 60).toString().padStart(2, "0");
+          document.getElementById(
+            "time-elapsed"
+          ).textContent = `${minutes}:${seconds}`;
+        }
+
+        clearGrid() {
+          this.grid = Array(9)
+            .fill()
+            .map(() => Array(9).fill(0));
+          this.notes = Array(9)
+            .fill()
+            .map(() =>
+              Array(9)
+                .fill()
+                .map(() => new Set())
+            );
+          document.querySelectorAll(".cell input").forEach((input) => {
+            input.value = "";
+            input.parentElement.classList.remove("solving", "invalid");
+          });
+          this.updateStats();
+          clearInterval(this.timer);
+          document.getElementById("time-elapsed").textContent = "00:00";
+          document.getElementById("backtrack-count").textContent = "0";
+        }
+
+        toggleNotes() {
+          this.showNotes = !this.showNotes;
+          document.querySelectorAll(".notes").forEach((notes) => {
+            notes.style.display = this.showNotes ? "grid" : "none";
+          });
+        }
+
+        updateNotes(row, col) {
+          if (!this.showNotes) return;
+
+          const possibleValues = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+          // Remove values from same row, column and box
+          for (let i = 0; i < 9; i++) {
+            possibleValues.delete(this.grid[row][i]);
+            possibleValues.delete(this.grid[i][col]);
+          }
+
+          const boxRow = Math.floor(row / 3) * 3;
+          const boxCol = Math.floor(col / 3) * 3;
+          for (let i = boxRow; i < boxRow + 3; i++) {
+            for (let j = boxCol; j < boxCol + 3; j++) {
+              possibleValues.delete(this.grid[i][j]);
+            }
+          }
+
+          const notesDiv = document.querySelector(
+            `input[data-row="${row}"][data-col="${col}"]`
+          ).previousElementSibling;
+
+          notesDiv.querySelectorAll(".note").forEach((note, i) => {
+            note.textContent = possibleValues.has(i + 1) ? i + 1 : "";
+          });
+        }
+      }
+
+      const sudoku = new SudokuSolver();
+
+      function solveSudoku() {
+        sudoku.solve();
+      }
+
+      function clearGrid() {
+        sudoku.clearGrid();
+      }
+
+      function toggleNotes() {
+        sudoku.toggleNotes();
+      }
+
+      function loadExample() {
+        const example = [
+          [5, 3, 0, 0, 7, 0, 0, 0, 0],
+          [6, 0, 0, 1, 9, 5, 0, 0, 0],
+          [0, 9, 8, 0, 0, 0, 0, 6, 0],
+          [8, 0, 0, 0, 6, 0, 0, 0, 3],
+          [4, 0, 0, 8, 0, 3, 0, 0, 1],
+          [7, 0, 0, 0, 2, 0, 0, 0, 6],
+          [0, 6, 0, 0, 0, 0, 2, 8, 0],
+          [0, 0, 0, 4, 1, 9, 0, 0, 5],
+          [0, 0, 0, 0, 8, 0, 0, 7, 9],
+        ];
+
+        sudoku.clearGrid();
+        sudoku.grid = example.map((row) => [...row]);
+
+        document.querySelectorAll(".cell input").forEach((input, index) => {
+          const row = Math.floor(index / 9);
+          const col = index % 9;
+          input.value = example[row][col] || "";
+        });
+
+        sudoku.updateStats();
+      }
+
+      function loadPuzzle(difficulty) {
+        // Here you would typically load a puzzle from a database or API
+        // For now, we'll just load the example puzzle
+        loadExample();
+      }
+    </script>
+  </body>
+</html>
